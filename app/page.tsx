@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { questionBank, type QuizQuestion } from "./questions";
 
 const questionsPerRound = 10;
 const secondsPerQuestion = 15;
 const optionLetters = ["A", "B", "C", "D"];
+const leaderboardKey = "brightside-quiz-leaderboard";
+const playerNameKey = "brightside-quiz-player-name";
+
+type ScoreEntry = { name: string; score: number; playedAt: number };
 
 function shuffle<T>(items: readonly T[]): T[] {
   const shuffled = [...items];
@@ -33,6 +38,9 @@ function createRound(): QuizQuestion[] {
 
 export default function Home() {
   const [round, setRound] = useState<QuizQuestion[] | null>(null);
+  const [playerName, setPlayerName] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [leaderboard, setLeaderboard] = useState<ScoreEntry[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
@@ -43,10 +51,47 @@ export default function Home() {
   const incorrectCount = (round?.length ?? questionsPerRound) - correctCount;
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => setRound(createRound()));
-
-    return () => window.cancelAnimationFrame(frame);
+    try {
+      const savedName = window.localStorage.getItem(playerNameKey) ?? "";
+      const savedScores = JSON.parse(
+        window.localStorage.getItem(leaderboardKey) ?? "[]",
+      ) as ScoreEntry[];
+      setPlayerName(savedName);
+      setNameInput(savedName);
+      setLeaderboard(
+        Array.isArray(savedScores)
+          ? savedScores
+              .filter(
+                (entry) =>
+                  typeof entry?.name === "string" &&
+                  Number.isFinite(entry.score) &&
+                  Number.isFinite(entry.playedAt),
+              )
+              .sort((a, b) => b.score - a.score || b.playedAt - a.playedAt)
+              .slice(0, 10)
+          : [],
+      );
+    } catch {
+      setLeaderboard([]);
+    }
   }, []);
+
+  function startGame(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = nameInput.trim();
+    if (!name) return;
+    setPlayerName(name);
+    try {
+      window.localStorage.setItem(playerNameKey, name);
+    } catch {
+      // The current session can still be played when browser storage is unavailable.
+    }
+    setRound(createRound());
+    setQuestionIndex(0);
+    setCorrectCount(0);
+    setTimeLeft(secondsPerQuestion);
+    setIsComplete(false);
+  }
 
   const submitAnswer = useCallback(
     (isCorrect: boolean) => {
@@ -61,6 +106,17 @@ export default function Home() {
       }
 
       if (questionIndex === round.length - 1) {
+        const finalScore = correctCount + (isCorrect ? 1 : 0);
+        const entry = { name: playerName, score: finalScore, playedAt: Date.now() };
+        const updated = [...leaderboard, entry]
+          .sort((a, b) => b.score - a.score || b.playedAt - a.playedAt)
+          .slice(0, 10);
+        setLeaderboard(updated);
+        try {
+          window.localStorage.setItem(leaderboardKey, JSON.stringify(updated));
+        } catch {
+          // Keep the result visible for this session if storage is unavailable.
+        }
         setIsComplete(true);
         return;
       }
@@ -68,7 +124,7 @@ export default function Home() {
       setTimeLeft(secondsPerQuestion);
       setQuestionIndex((index) => index + 1);
     },
-    [questionIndex, round],
+    [correctCount, leaderboard, playerName, questionIndex, round],
   );
 
   useEffect(() => {
@@ -103,11 +159,9 @@ export default function Home() {
 
   function restartQuiz() {
     submittedRef.current = true;
-    setRound(createRound());
-    setQuestionIndex(0);
-    setCorrectCount(0);
-    setTimeLeft(secondsPerQuestion);
+    setRound(null);
     setIsComplete(false);
+    setNameInput(playerName);
   }
 
   return (
@@ -139,7 +193,28 @@ export default function Home() {
         </div>
 
         <div className="quiz-card">
-          {!isComplete && round && question ? (
+          {!round && !isComplete ? (
+            <div className="start-screen">
+              <span className="result-icon" aria-hidden="true">✦</span>
+              <p className="question-kicker">READY TO PLAY?</p>
+              <h2 className="result-title">What should we call you?</h2>
+              <p className="result-description">Your name will appear beside your score.</p>
+              <form className="name-form" onSubmit={startGame}>
+                <label className="name-label" htmlFor="player-name">Your name</label>
+                <input
+                  autoComplete="name"
+                  className="name-input"
+                  id="player-name"
+                  maxLength={24}
+                  onChange={(event) => setNameInput(event.target.value)}
+                  placeholder="Enter your name"
+                  required
+                  value={nameInput}
+                />
+                <button className="restart-button" type="submit">Start the quiz</button>
+              </form>
+            </div>
+          ) : !isComplete && round && question ? (
             <>
               <div className="card-topline">
                 <span className="category-label">
@@ -250,8 +325,7 @@ export default function Home() {
                       : "Every day is a chance to learn."}
               </h2>
               <p className="result-description">
-                You got <strong>{correctCount}</strong> out of {questionsPerRound}{" "}
-                questions right.
+                <strong>{playerName}</strong>, you got <strong>{correctCount}</strong> out of {questionsPerRound} questions right.
               </p>
 
               <div className="score-summary">
@@ -264,6 +338,8 @@ export default function Home() {
                   <span className="score-label">Incorrect</span>
                 </div>
               </div>
+
+              <Leaderboard scores={leaderboard} />
 
               <button
                 className="restart-button"
@@ -286,5 +362,29 @@ export default function Home() {
         </p>
       </section>
     </main>
+  );
+}
+
+function Leaderboard({ scores }: { scores: ScoreEntry[] }) {
+  return (
+    <section className="leaderboard" aria-label="Top 10 scores">
+      <div className="leaderboard-heading">
+        <h3>Top 10 scores</h3>
+        <span>Best rounds</span>
+      </div>
+      {scores.length ? (
+        <ol className="leaderboard-list">
+          {scores.map((entry, index) => (
+            <li key={`${entry.playedAt}-${index}`}>
+              <span className="leaderboard-rank">{index + 1}</span>
+              <span className="leaderboard-name">{entry.name}</span>
+              <strong>{entry.score}/{questionsPerRound}</strong>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="leaderboard-empty">Your completed rounds will show up here.</p>
+      )}
+    </section>
   );
 }
