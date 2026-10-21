@@ -45,11 +45,16 @@ a:focus-visible {
 }
 
 .quiz-page {
+  --category: #54705e;
+  --category-soft: #f0f3ed;
+  --category-line: #dfe8dc;
+  --category-text: #3e5c49;
   min-height: 100vh;
   overflow-x: clip;
   background:
-    radial-gradient(ellipse at 50% 35%, rgb(232 235 225 / 42%), transparent 42%),
+    radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--category) 14%, transparent), transparent 48%),
     var(--background);
+  transition: background 240ms ease;
 }
 
 .site-header {
@@ -155,6 +160,118 @@ a:focus-visible {
     0 3px 10px rgb(49 53 43 / 3%);
 }
 
+.quiz-card {
+  --category: #54705e;
+  --category-soft: #f0f3ed;
+  --category-line: #dfe8dc;
+  --category-text: #3e5c49;
+}
+
+.category-theme-science {
+  --category: #facc15;
+  --category-soft: #fffbe6;
+  --category-line: #f4df80;
+  --category-text: #854d0e;
+}
+
+.quiz-page.category-theme-science { --background: #fffdf0; --accent: #eab308; --accent-dark: #854d0e; }
+
+.category-theme-geography {
+  --category: #1d4ed8;
+  --category-soft: #eef3ff;
+  --category-line: #c3d2ff;
+  --category-text: #1e40af;
+}
+
+.quiz-page.category-theme-geography { --background: #f2f5ff; --accent: #1d4ed8; --accent-dark: #1e40af; }
+
+.category-theme-nature {
+  --category: #15803d;
+  --category-soft: #edf9f0;
+  --category-line: #b9e4c5;
+  --category-text: #166534;
+}
+
+.quiz-page.category-theme-nature { --background: #f1faf3; --accent: #15803d; --accent-dark: #166534; }
+
+.category-theme-math-logic {
+  --category: #7e22ce;
+  --category-soft: #f6efff;
+  --category-line: #ddc2f5;
+  --category-text: #6b21a8;
+}
+
+.quiz-page.category-theme-math-logic { --background: #faf5ff; --accent: #7e22ce; --accent-dark: #6b21a8; }
+
+.category-theme-arts-culture {
+  --category: #db2777;
+  --category-soft: #fff0f6;
+  --category-line: #f6c1da;
+  --category-text: #be185d;
+}
+
+.quiz-page.category-theme-arts-culture { --background: #fff5f9; --accent: #db2777; --accent-dark: #be185d; }
+
+.category-theme-sports {
+  --category: #dc2626;
+  --category-soft: #fff1f1;
+  --category-line: #fac5c5;
+  --category-text: #b91c1c;
+}
+
+.quiz-page.category-theme-sports { --background: #fff5f5; --accent: #dc2626; --accent-dark: #b91c1c; }
+
+.category-screen {
+  display: flex;
+  min-height: 380px;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 0 14px;
+  text-align: center;
+}
+
+.category-screen .question-kicker { margin: 18px 0 9px; }
+.category-screen .result-description { margin: 9px 0 21px; }
+
+.category-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.category-option {
+  display: grid;
+  min-height: 112px;
+  justify-items: start;
+  align-content: start;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid var(--category);
+  border-radius: 9px;
+  background: var(--category);
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.category-option:hover { transform: translateY(-2px); background: color-mix(in srgb, var(--category) 86%, black); box-shadow: 0 8px 18px color-mix(in srgb, var(--category) 25%, transparent); }
+.category-option-icon { color: #fff; font-size: 19px; line-height: 1; }
+.category-option-name { font-size: 12px; font-weight: 700; }
+.category-option-description { color: rgb(255 255 255 / 88%); font-size: 10px; line-height: 1.35; }
+.category-option.category-theme-science { color: #fff; }
+.category-option.category-theme-science .category-option-icon { color: #fff; }
+.category-option.category-theme-science .category-option-description { color: rgb(255 255 255 / 88%); }
+.quiz-card.category-theme-science .result-actions .restart-button { color: #422006; }
+
+.category-theme-general-knowledge {
+  --category: #c45b89;
+  --category-soft: #fbf0f5;
+  --category-line: #f0d8e3;
+  --category-text: #984064;
+}
+
 .quiz-loading {
   display: grid;
   min-height: 380px;
@@ -184,8 +301,8 @@ a:focus-visible {
   height: 25px;
   place-items: center;
   border-radius: 8px;
-  background: #f0f3ed;
-  color: var(--accent);
+  background: var(--category-soft);
+  color: var(--category);
   font-size: 14px;
 }
 
@@ -217,10 +334,10 @@ a:focus-visible {
   justify-content: center;
   gap: 4px;
   padding: 6px 8px;
-  border: 1px solid #e5ebe3;
+  border: 1px solid var(--category-line);
   border-radius: 6px;
-  background: #f5f8f3;
-  color: #4e6b53;
+  background: var(--category-soft);
+  color: var(--category-text);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -253,7 +370,7 @@ a:focus-visible {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #718f78;
+  background: var(--category);
   transition: width 220ms ease;
 }
 
@@ -269,7 +386,7 @@ a:focus-visible {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #a3b49e;
+  background: color-mix(in srgb, var(--category) 64%, white);
   transition:
     width 200ms linear,
     background-color 180ms ease;
@@ -510,6 +627,12 @@ a:focus-visible {
   font-size: 11px;
 }
 
+.leaderboard-list li {
+  border-left: 3px solid var(--category, #54705e);
+  padding-left: 8px;
+  background: color-mix(in srgb, var(--category, #54705e) 6%, white);
+}
+
 .leaderboard-rank {
   width: 18px;
   color: #92948b;
@@ -519,13 +642,35 @@ a:focus-visible {
 .leaderboard-name {
   flex: 1;
   overflow: hidden;
+  color: var(--category-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .leaderboard-list strong {
-  color: var(--accent-dark);
+  color: var(--category-text, var(--accent-dark));
   font-variant-numeric: tabular-nums;
+}
+
+.leaderboard-category {
+  color: var(--category, var(--muted));
+  font-size: 9px;
+}
+
+.result-category {
+  margin: -13px 0 17px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.result-category span {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid var(--category);
+  border-radius: 999px;
+  background: var(--category);
+  color: #fff;
+  font-weight: 600;
 }
 
 .leaderboard-empty {
@@ -586,23 +731,27 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px solid #eeefea;
+  border: 1px solid var(--category-line);
   border-radius: 8px;
-  background: #fcfcfb;
+  background: var(--category-soft);
+}
+
+.score-summary .score-tile.correct-tile {
+  border: 2px solid #16a34a;
+}
+
+.score-summary .score-tile.incorrect-tile {
+  border: 2px solid #dc2626;
 }
 
 .score-number {
-  color: var(--accent-dark);
+  color: var(--category-text);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 24px;
 }
 
-.incorrect-tile .score-number {
-  color: #9b7169;
-}
-
 .score-label {
-  color: #81837b;
+  color: var(--category-text);
   font-size: 10px;
 }
 
@@ -633,6 +782,77 @@ a:focus-visible {
 
 .restart-button span {
   font-size: 16px;
+}
+
+.result-actions {
+  display: grid;
+  width: min(100%, 320px);
+  gap: 10px;
+  margin-top: 21px;
+}
+
+.result-actions .restart-button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0;
+  padding: 0 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.result-actions .restart-button:not(.secondary-action) {
+  border: 1px solid var(--category);
+  background: var(--category);
+  color: #fff;
+}
+
+.result-actions .restart-button:not(.secondary-action):hover {
+  border-color: color-mix(in srgb, var(--category) 78%, black);
+  background: var(--category);
+  color: #fff;
+}
+
+.result-actions .secondary-action {
+  border: 1px solid var(--category-line);
+  background: #fff;
+  color: var(--category-text);
+}
+
+.result-actions .secondary-action:hover {
+  border-color: var(--category-line);
+  background: #fff;
+  color: var(--category-text);
+}
+
+.action-icon {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.result-actions .restart-button:hover {
+  border-color: var(--category);
+  background: #fff;
+  color: var(--category-text);
+}
+
+.result-actions .restart-button:not(.secondary-action):hover {
+  border-color: var(--category);
+  background: var(--category);
+  color: #fff;
+}
+
+.result-actions .restart-button.change-username-action,
+.result-actions .restart-button.change-username-action:hover {
+  border: 2px solid var(--category);
+  background: #fff;
+  color: var(--category);
 }
 
 .result-footnote {

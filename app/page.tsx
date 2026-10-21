@@ -10,8 +10,23 @@ const secondsPerQuestion = 15;
 const optionLetters = ["A", "B", "C", "D"];
 const leaderboardKey = "brightside-quiz-leaderboard";
 const playerNameKey = "brightside-quiz-player-name";
+const categories = [
+  { name: "Science", icon: "⚛", description: "Discover how the world works" },
+  { name: "Geography", icon: "⌖", description: "Explore places near and far" },
+  { name: "Math & Logic", icon: "＋", description: "Put your reasoning to work" },
+  { name: "Nature", icon: "❋", description: "Meet the natural world" },
+  { name: "Arts & Culture", icon: "✦", description: "Celebrate creativity and culture" },
+  { name: "Sports", icon: "◎", description: "Take your best shot" },
+] as const;
 
-type ScoreEntry = { name: string; score: number; playedAt: number };
+type ScoreEntry = { name: string; score: number; category?: string; playedAt: number };
+
+function categoryClass(category?: string) {
+  return `category-theme-${(category ?? "General Knowledge")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")}`;
+}
 
 function shuffle<T>(items: readonly T[]): T[] {
   const shuffled = [...items];
@@ -27,8 +42,8 @@ function shuffle<T>(items: readonly T[]): T[] {
   return shuffled;
 }
 
-function createRound(): QuizQuestion[] {
-  return shuffle(questionBank)
+function createRound(category: string): QuizQuestion[] {
+  return shuffle(questionBank.filter((question) => question.category === category))
     .slice(0, questionsPerRound)
     .map((question) => ({
       ...question,
@@ -39,6 +54,7 @@ function createRound(): QuizQuestion[] {
 export default function Home() {
   const [round, setRound] = useState<QuizQuestion[] | null>(null);
   const [playerName, setPlayerName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [leaderboard, setLeaderboard] = useState<ScoreEntry[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -49,6 +65,16 @@ export default function Home() {
 
   const question = round?.[questionIndex];
   const incorrectCount = (round?.length ?? questionsPerRound) - correctCount;
+  const resultCategory = round
+    ? round.reduce((counts, item) => {
+        counts[item.category] = (counts[item.category] ?? 0) + 1;
+        return counts;
+      }, {} as Record<string, number>)
+    : {};
+  const leadingCategory = Object.entries(resultCategory).sort(
+    ([categoryA, countA], [categoryB, countB]) =>
+      countB - countA || categoryA.localeCompare(categoryB),
+  )[0]?.[0] ?? "General Knowledge";
 
   useEffect(() => {
     try {
@@ -56,7 +82,8 @@ export default function Home() {
       const savedScores = JSON.parse(
         window.localStorage.getItem(leaderboardKey) ?? "[]",
       ) as ScoreEntry[];
-      setPlayerName(savedName);
+      // Keep the saved name as a convenient input value, but require the
+      // username step to be submitted before showing category selection.
       setNameInput(savedName);
       setLeaderboard(
         Array.isArray(savedScores)
@@ -86,7 +113,17 @@ export default function Home() {
     } catch {
       // The current session can still be played when browser storage is unavailable.
     }
-    setRound(createRound());
+    setSelectedCategory(null);
+    setRound(null);
+    setQuestionIndex(0);
+    setCorrectCount(0);
+    setTimeLeft(secondsPerQuestion);
+    setIsComplete(false);
+  }
+
+  function chooseCategory(category: string) {
+    setSelectedCategory(category);
+    setRound(createRound(category));
     setQuestionIndex(0);
     setCorrectCount(0);
     setTimeLeft(secondsPerQuestion);
@@ -107,7 +144,12 @@ export default function Home() {
 
       if (questionIndex === round.length - 1) {
         const finalScore = correctCount + (isCorrect ? 1 : 0);
-        const entry = { name: playerName, score: finalScore, playedAt: Date.now() };
+        const entry = {
+          name: playerName,
+          score: finalScore,
+          category: leadingCategory,
+          playedAt: Date.now(),
+        };
         const updated = [...leaderboard, entry]
           .sort((a, b) => b.score - a.score || b.playedAt - a.playedAt)
           .slice(0, 10);
@@ -124,7 +166,7 @@ export default function Home() {
       setTimeLeft(secondsPerQuestion);
       setQuestionIndex((index) => index + 1);
     },
-    [correctCount, leaderboard, playerName, questionIndex, round],
+    [correctCount, leadingCategory, leaderboard, playerName, questionIndex, round],
   );
 
   useEffect(() => {
@@ -157,15 +199,45 @@ export default function Home() {
     }
   }
 
-  function restartQuiz() {
+  function replayCategory() {
+    submittedRef.current = true;
+    const category = selectedCategory ?? leadingCategory;
+    setSelectedCategory(category);
+    setRound(createRound(category));
+    setQuestionIndex(0);
+    setCorrectCount(0);
+    setTimeLeft(secondsPerQuestion);
+    setIsComplete(false);
+  }
+
+  function chooseAnotherCategory() {
     submittedRef.current = true;
     setRound(null);
+    setSelectedCategory(null);
     setIsComplete(false);
     setNameInput(playerName);
   }
 
+  function startNextGame() {
+    submittedRef.current = true;
+    setRound(null);
+    setSelectedCategory(null);
+    setPlayerName("");
+    setNameInput("");
+    setIsComplete(false);
+    setQuestionIndex(0);
+    setCorrectCount(0);
+    try {
+      window.localStorage.removeItem(playerNameKey);
+    } catch {
+      // The next game can still start when browser storage is unavailable.
+    }
+  }
+
+  const activeCategory = selectedCategory ?? (isComplete ? leadingCategory : question?.category);
+
   return (
-    <main className="quiz-page">
+    <main className={`quiz-page ${categoryClass(activeCategory)}`}>
       <header className="site-header">
         <Link className="brand" href="/" aria-label="Brightside Quiz home">
           <span className="brand-mark" aria-hidden="true">
@@ -192,8 +264,8 @@ export default function Home() {
           
         </div>
 
-        <div className="quiz-card">
-          {!round && !isComplete ? (
+        <div className={`quiz-card ${categoryClass(activeCategory)}`}>
+          {!round && !isComplete && !playerName ? (
             <div className="start-screen">
               <span className="result-icon" aria-hidden="true">✦</span>
               <p className="question-kicker">READY TO PLAY?</p>
@@ -214,6 +286,27 @@ export default function Home() {
                 <button className="restart-button" type="submit">Start the quiz</button>
               </form>
             </div>
+          ) : !selectedCategory && playerName && !round && !isComplete ? (
+            <div className="category-screen">
+              <span className="result-icon" aria-hidden="true">✦</span>
+              <p className="question-kicker">PICK YOUR PLAYGROUND</p>
+              <h2 className="result-title">What are you curious about?</h2>
+              <p className="result-description">Choose a category to start your 10-question round.</p>
+              <div className="category-grid">
+                {categories.map((category) => (
+                  <button
+                    className={`category-option ${categoryClass(category.name)}`}
+                    key={category.name}
+                    onClick={() => chooseCategory(category.name)}
+                    type="button"
+                  >
+                    <span className="category-option-icon" aria-hidden="true">{category.icon}</span>
+                    <span className="category-option-name">{category.name}</span>
+                    <span className="category-option-description">{category.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           ) : !isComplete && round && question ? (
             <>
               <div className="card-topline">
@@ -221,7 +314,7 @@ export default function Home() {
                   <span className="category-icon" aria-hidden="true">
                     ✳
                   </span>
-                  General knowledge
+                  {selectedCategory}
                 </span>
                 <div className="question-status">
                   <span className="question-count">
@@ -327,6 +420,9 @@ export default function Home() {
               <p className="result-description">
                 <strong>{playerName}</strong>, you got <strong>{correctCount}</strong> out of {questionsPerRound} questions right.
               </p>
+              <p className="result-category">
+                Round theme: <span className={categoryClass(selectedCategory ?? leadingCategory)}>{selectedCategory ?? leadingCategory}</span>
+              </p>
 
               <div className="score-summary">
                 <div className="score-tile correct-tile">
@@ -339,15 +435,29 @@ export default function Home() {
                 </div>
               </div>
 
-              <Leaderboard scores={leaderboard} />
+              <Leaderboard scores={leaderboard} category={selectedCategory ?? leadingCategory} />
 
-              <button
-                className="restart-button"
-                onClick={restartQuiz}
-                type="button"
-              >
-                <span aria-hidden="true">↻</span> Give it another go
-              </button>
+              <div className="result-actions">
+                <button className="restart-button" onClick={replayCategory} type="button">
+                  <span aria-hidden="true">↻</span> Give it another go
+                </button>
+                <button className="restart-button secondary-action choose-category-action" onClick={chooseAnotherCategory} type="button">
+                  <svg className="action-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                    <rect x="2" y="2" width="5" height="5" rx="1" />
+                    <rect x="9" y="2" width="5" height="5" rx="1" />
+                    <rect x="2" y="9" width="5" height="5" rx="1" />
+                    <rect x="9" y="9" width="5" height="5" rx="1" />
+                  </svg>
+                  Choose Category
+                </button>
+                <button className="restart-button secondary-action change-username-action" onClick={startNextGame} type="button">
+                  <svg className="action-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                    <circle cx="8" cy="5" r="3" />
+                    <path d="M2.5 14c.4-2.8 2.5-4.5 5.5-4.5s5.1 1.7 5.5 4.5" />
+                  </svg>
+                  Change Username
+                </button>
+              </div>
               <p className="result-footnote">Thanks for playing. Stay curious!</p>
             </div>
           ) : (
@@ -365,7 +475,7 @@ export default function Home() {
   );
 }
 
-function Leaderboard({ scores }: { scores: ScoreEntry[] }) {
+function Leaderboard({ scores, category }: { scores: ScoreEntry[]; category: string }) {
   return (
     <section className="leaderboard" aria-label="Top 10 scores">
       <div className="leaderboard-heading">
@@ -375,9 +485,10 @@ function Leaderboard({ scores }: { scores: ScoreEntry[] }) {
       {scores.length ? (
         <ol className="leaderboard-list">
           {scores.map((entry, index) => (
-            <li key={`${entry.playedAt}-${index}`}>
+            <li className={categoryClass(entry.category)} key={`${entry.playedAt}-${index}`}>
               <span className="leaderboard-rank">{index + 1}</span>
               <span className="leaderboard-name">{entry.name}</span>
+              <span className="leaderboard-category">{entry.category ?? "General Knowledge"}</span>
               <strong>{entry.score}/{questionsPerRound}</strong>
             </li>
           ))}
