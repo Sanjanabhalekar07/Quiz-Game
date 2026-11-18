@@ -149,6 +149,50 @@ a:focus-visible {
   line-height: 1.6;
 }
 
+.quiz-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quiz-stepper li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #a0a198;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.quiz-stepper li > span {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  border: 1px solid #e5e6df;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.quiz-stepper li.step-active {
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.quiz-stepper li.step-active > span {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
 .quiz-card {
   min-height: 428px;
   padding: 28px 32px 19px;
@@ -317,6 +361,11 @@ a:focus-visible {
   gap: 13px;
 }
 
+.question-timer {
+  display: block;
+  width: 68px;
+}
+
 .question-count strong {
   color: var(--foreground);
   font-size: 14px;
@@ -375,6 +424,7 @@ a:focus-visible {
 }
 
 .timer-track {
+  width: 100%;
   height: 3px;
   margin-top: 5px;
   overflow: hidden;
