@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
@@ -16,12 +17,14 @@ import {
   isScoreEntry,
   leaderboardKey,
   playerNameKey,
+  playerEmailKey,
   type ScoreEntry,
 } from "./quiz-data";
 
 type QuizState = {
   hydrated: boolean;
   playerName: string;
+  playerEmail: string;
   selectedCategory: string | null;
   round: QuizQuestion[];
   questionIndex: number;
@@ -34,6 +37,7 @@ type QuizState = {
 const initialState: QuizState = {
   hydrated: false,
   playerName: "",
+  playerEmail: "",
   selectedCategory: null,
   round: [],
   questionIndex: 0,
@@ -51,6 +55,7 @@ function readState(): QuizState {
 
   try {
     const playerName = window.localStorage.getItem(playerNameKey) ?? "";
+    const playerEmail = window.localStorage.getItem(playerEmailKey) ?? "";
     const savedScores = JSON.parse(
       window.localStorage.getItem(leaderboardKey) ?? "[]",
     ) as unknown;
@@ -71,6 +76,7 @@ function readState(): QuizState {
       ...initialState,
       hydrated: true,
       playerName,
+      playerEmail,
       leaderboard,
       selectedCategory:
         typeof savedSession.selectedCategory === "string"
@@ -113,6 +119,7 @@ function subscribe(listener: () => void) {
     if (
       event.key === null ||
       event.key === playerNameKey ||
+      event.key === playerEmailKey ||
       event.key === leaderboardKey ||
       event.key === gameSessionKey
     ) {
@@ -134,6 +141,7 @@ function updateState(updater: (current: QuizState) => QuizState) {
 
   try {
     window.localStorage.setItem(playerNameKey, nextState.playerName);
+    window.localStorage.setItem(playerEmailKey, nextState.playerEmail);
     window.localStorage.setItem(
       leaderboardKey,
       JSON.stringify(nextState.leaderboard),
@@ -157,9 +165,10 @@ function updateState(updater: (current: QuizState) => QuizState) {
 }
 
 type QuizContextValue = QuizState & {
-  setPlayerName: (name: string) => void;
+  setPlayerName: (name: string, email: string) => void;
+  updatePlayerIdentity: (name: string, email: string) => void;
   selectCategory: (category: string) => void;
-  submitAnswer: (isCorrect: boolean, expectedQuestionIndex: number) => boolean;
+  submitAnswer: (isCorrect: boolean, expectedQuestionIndex: number) => Promise<boolean>;
   replayCategory: () => void;
   chooseAnotherCategory: () => void;
   startNextGame: () => void;
@@ -170,16 +179,41 @@ const QuizContext = createContext<QuizContextValue | null>(null);
 export function QuizProvider({ children }: { children: ReactNode }) {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  const setPlayerName = useCallback((name: string) => {
+  useEffect(() => {
+    void fetch("/api/scores")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { scores?: unknown } | null) => {
+        if (!data || !Array.isArray(data.scores)) return;
+        const leaderboard = data.scores
+          .filter(isScoreEntry)
+          .sort((a, b) => b.score - a.score || b.playedAt - a.playedAt)
+          .slice(0, 10);
+        updateState((current) => ({ ...current, leaderboard }));
+      })
+      .catch(() => {
+        // Keep the locally saved leaderboard available when the database is offline.
+      });
+  }, []);
+
+  const setPlayerName = useCallback((name: string, email: string) => {
     updateState((current) => ({
       ...current,
       playerName: name,
+      playerEmail: email,
       selectedCategory: null,
       round: [],
       questionIndex: 0,
       correctCount: 0,
       isComplete: false,
       hasSubmitted: false,
+    }));
+  }, []);
+
+  const updatePlayerIdentity = useCallback((name: string, email: string) => {
+    updateState((current) => ({
+      ...current,
+      playerName: name,
+      playerEmail: email,
     }));
   }, []);
 
@@ -195,7 +229,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const submitAnswer = useCallback((isCorrect: boolean, expectedQuestionIndex: number) => {
+  const submitAnswer = useCallback(async (isCorrect: boolean, expectedQuestionIndex: number) => {
     const current = getSnapshot();
     if (
       !current.round.length ||
@@ -222,6 +256,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
     const category = current.selectedCategory ?? current.round[0].category;
     const entry: ScoreEntry = {
       name: current.playerName,
+      email: current.playerEmail,
       score: correctCount,
       category,
       playedAt: Date.now(),
@@ -237,6 +272,25 @@ export function QuizProvider({ children }: { children: ReactNode }) {
       isComplete: true,
       hasSubmitted: true,
     }));
+    try {
+      const response = await fetch("/api/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry),
+      });
+      const data = response.ok
+        ? (await response.json()) as { scores?: unknown }
+        : null;
+      if (data && Array.isArray(data.scores)) {
+        const scores = data.scores
+          .filter(isScoreEntry)
+          .sort((a, b) => b.score - a.score || b.playedAt - a.playedAt)
+          .slice(0, 10);
+        updateState((latest) => ({ ...latest, leaderboard: scores }));
+      }
+    } catch {
+      // The completed round remains saved locally if MongoDB is unavailable.
+    }
     return true;
   }, []);
 
@@ -278,6 +332,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       setPlayerName,
+      updatePlayerIdentity,
       selectCategory,
       submitAnswer,
       replayCategory,
@@ -287,6 +342,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
     [
       state,
       setPlayerName,
+      updatePlayerIdentity,
       selectCategory,
       submitAnswer,
       replayCategory,

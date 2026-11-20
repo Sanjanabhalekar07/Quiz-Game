@@ -5,6 +5,7 @@ export const secondsPerQuestion = 15;
 export const optionLetters = ["A", "B", "C", "D"];
 export const leaderboardKey = "brightside-quiz-leaderboard";
 export const playerNameKey = "brightside-quiz-player-name";
+export const playerEmailKey = "brightside-quiz-player-email";
 export const gameSessionKey = "brightside-quiz-session";
 
 export const categories = [
@@ -18,6 +19,7 @@ export const categories = [
 
 export type ScoreEntry = {
   name: string;
+  email?: string;
   score: number;
   category?: string;
   playedAt: number;
@@ -70,6 +72,7 @@ export function isScoreEntry(value: unknown): value is ScoreEntry {
   const score = value as Partial<ScoreEntry>;
   return (
     typeof score.name === "string" &&
+    (score.email === undefined || typeof score.email === "string") &&
     Number.isFinite(score.score) &&
     Number.isFinite(score.playedAt)
   );

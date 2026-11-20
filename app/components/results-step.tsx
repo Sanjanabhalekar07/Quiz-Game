@@ -17,7 +17,6 @@ export function ResultsStep() {
     leaderboard,
     replayCategory,
     chooseAnotherCategory,
-    startNextGame,
   } = useQuiz();
   const category = selectedCategory ?? round[0]?.category ?? "General Knowledge";
   const incorrectCount = round.length - correctCount;
@@ -28,7 +27,7 @@ export function ResultsStep() {
   }, [hydrated, isComplete, playerName, round.length, router]);
 
   if (!hydrated || !playerName || !isComplete || !round.length) {
-    return <div className="quiz-loading" role="status">Getting your results…</div>;
+    return <div className="quiz-loading" role="status">Getting your resultsâ€¦</div>;
   }
 
   function replay() {
@@ -41,17 +40,12 @@ export function ResultsStep() {
     router.push("/categories");
   }
 
-  function changeName() {
-    startNextGame();
-    router.push("/");
-  }
-
   return (
     <div className="results">
       <span className="result-icon" aria-hidden="true">
-        {correctCount >= 7 ? "✦" : "✓"}
+        {correctCount >= 7 ? "âœ¦" : "âœ“"}
       </span>
-      <p className="question-kicker">STEP 4 · QUIZ COMPLETE</p>
+      <p className="question-kicker">STEP 4 Â· QUIZ COMPLETE</p>
       <h2 className="result-title">
         {correctCount === questionsPerRound
           ? "A perfect round!"
@@ -83,7 +77,7 @@ export function ResultsStep() {
 
       <div className="result-actions">
         <button className="restart-button" onClick={replay} type="button">
-          <span aria-hidden="true">↻</span> Give it another go
+          <span aria-hidden="true">â†»</span> Give it another go
         </button>
         <button className="restart-button secondary-action choose-category-action" onClick={chooseAnother} type="button">
           <svg className="action-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
@@ -93,13 +87,6 @@ export function ResultsStep() {
             <rect x="9" y="9" width="5" height="5" rx="1" />
           </svg>
           Choose Category
-        </button>
-        <button className="restart-button secondary-action change-username-action" onClick={changeName} type="button">
-          <svg className="action-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-            <circle cx="8" cy="5" r="3" />
-            <path d="M2.5 14c.4-2.8 2.5-4.5 5.5-4.5s5.1 1.7 5.5 4.5" />
-          </svg>
-          Change Username
         </button>
       </div>
       <p className="result-footnote">Thanks for playing. Stay curious!</p>

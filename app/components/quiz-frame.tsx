@@ -1,25 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { categoryClass } from "../quiz-data";
 import { useQuiz } from "../quiz-context";
 
-const pageNames = ["Your name", "Category", "Quiz", "Results"];
-
 export function QuizFrame({
   children,
-  step,
   title,
   description,
 }: {
   children: ReactNode;
-  step: number;
   title: ReactNode;
   description: string;
 }) {
+  const router = useRouter();
   const game = useQuiz();
   const activeCategory = game.selectedCategory ?? game.round[0]?.category;
+
+  async function logOut() {
+    await fetch("/api/auth/sign-out", { method: "POST" }).catch(() => undefined);
+    game.startNextGame();
+    router.push("/");
+  }
 
   return (
     <main className={`quiz-page ${categoryClass(activeCategory)}`}>
@@ -29,8 +33,20 @@ export function QuizFrame({
           <span>brightside</span>
         </Link>
         <span className="header-note">
-          <span className="status-dot" aria-hidden="true" />
-          A little brain break
+          {game.playerName ? (
+            <>
+              <span className="account-copy">
+                <strong className="account-name">{game.playerName}</strong>
+              </span>
+              <Link className="profile-button" href="/profile">Profile</Link>
+              <button className="logout-button" type="button" onClick={logOut}>Log Out</button>
+            </>
+          ) : (
+            <>
+              <span className="status-dot" aria-hidden="true" />
+              A little brain break
+            </>
+          )}
         </span>
       </header>
 
@@ -41,18 +57,6 @@ export function QuizFrame({
           </span>
           <h1 id="page-title">{title}</h1>
           <p>{description}</p>
-          <ol className="quiz-stepper" aria-label="Quiz steps">
-            {pageNames.map((name, index) => (
-              <li
-                aria-current={index + 1 === step ? "step" : undefined}
-                className={index + 1 <= step ? "step-active" : undefined}
-                key={name}
-              >
-                <span>{index + 1}</span>
-                {name}
-              </li>
-            ))}
-          </ol>
         </div>
 
         <div className={`quiz-card ${categoryClass(activeCategory)}`}>

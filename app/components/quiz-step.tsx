@@ -14,8 +14,8 @@ export function QuizStep() {
   const { hydrated, playerName, round, questionIndex, correctCount, isComplete, submitAnswer } = useQuiz();
   const question = round[questionIndex];
 
-  const expireQuestion = useCallback(() => {
-    if (submitAnswer(false, questionIndex)) router.push("/results");
+  const expireQuestion = useCallback(async () => {
+    if (await submitAnswer(false, questionIndex)) router.push("/results");
   }, [questionIndex, router, submitAnswer]);
 
   useEffect(() => {
@@ -24,8 +24,8 @@ export function QuizStep() {
     else if (hydrated && isComplete) router.replace("/results");
   }, [hydrated, isComplete, playerName, round.length, router]);
 
-  function selectAnswer(option: string) {
-    if (question && submitAnswer(option === question.answer, questionIndex)) {
+  async function selectAnswer(option: string) {
+    if (question && await submitAnswer(option === question.answer, questionIndex)) {
       router.push("/results");
     }
   }
