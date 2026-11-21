@@ -74,10 +74,13 @@ export function WelcomeStep() {
           <button className="auth-switch" type="button" onClick={() => setMode(null)}>Back</button>
         </form>
       ) : (
-        <div className="auth-actions">
-          <button className="restart-button" type="button" onClick={() => setMode("login")}>Login</button>
-          <button className="restart-button auth-secondary" type="button" onClick={() => setMode("signup")}>Sign in</button>
-        </div>
+        <>
+          <div className="auth-actions">
+            <button className="restart-button" type="button" onClick={() => setMode("login")}>Login</button>
+            <button className="restart-button auth-secondary" type="button" onClick={() => setMode("signup")}>Sign in</button>
+          </div>
+          <a className="auth-switch" href="/admin/login">Admin login</a>
+        </>
       )}
     </div>
   );

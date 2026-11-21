@@ -1,17 +1,11 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { getAuthSession, createSessionCookie } from "../../../../lib/auth-session";
-import { getDatabase } from "../../../../lib/mongodb";
-import type { ScoreEntry } from "../../../quiz-data";
+import connectToDatabase from "../../../../lib/mongoose";
+import Score from "../../../../models/Score";
+import User from "../../../../models/User";
 
 const scrypt = promisify(scryptCallback);
-
-type Account = {
-  name: string;
-  email: string;
-  passwordHash: string;
-  passwordSalt: string;
-};
 
 async function hashPassword(password: string, salt: string) {
   return ((await scrypt(password, salt, 64)) as Buffer).toString("hex");
@@ -22,19 +16,13 @@ export async function GET(request: Request) {
   if (!session) return Response.json({ error: "Please sign in to view your profile." }, { status: 401 });
 
   try {
-    const db = await getDatabase();
-    const account = await db.collection<Account>("users").findOne(
-      { email: session.email },
-      { projection: { _id: 0, name: 1, email: 1 } },
-    );
+    await connectToDatabase();
+    const account = await User.findOne({ email: session.email }).select("name email").exec();
     if (!account) return Response.json({ error: "Account not found." }, { status: 404 });
 
-    const scores = db.collection<ScoreEntry>("scores");
     const [games, highScoreGame] = await Promise.all([
-      scores.find({ email: session.email }, { projection: { _id: 0 } })
-        .sort({ playedAt: -1 }).limit(20).toArray(),
-      scores.find({ email: session.email }, { projection: { _id: 0 } })
-        .sort({ score: -1, playedAt: -1 }).limit(1).next(),
+      Score.find({ user_id: session.userId }).select("-_id -user_id").sort({ playedAt: -1 }).limit(20).lean().exec(),
+      Score.findOne({ user_id: session.userId }).select("-_id -user_id").sort({ score: -1, playedAt: -1 }).lean().exec(),
     ]);
 
     return Response.json({
@@ -82,10 +70,8 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const db = await getDatabase();
-    const accounts = db.collection<Account>("users");
-    await accounts.createIndex({ email: 1 }, { unique: true });
-    const account = await accounts.findOne({ email: session.email });
+    await connectToDatabase();
+    const account = await User.findOne({ email: session.email }).exec();
     if (!account) return Response.json({ error: "Account not found." }, { status: 404 });
 
     const submittedHash = Buffer.from(await hashPassword(currentPassword, account.passwordSalt), "hex");
@@ -94,28 +80,27 @@ export async function PATCH(request: Request) {
       return Response.json({ error: "Current password is incorrect." }, { status: 401 });
     }
 
-    if (email !== session.email && await accounts.findOne({ email })) {
+    if (email !== session.email && await User.exists({ email })) {
       return Response.json({ error: "That email is already in use." }, { status: 409 });
     }
 
-    const update: Partial<Account> = { name, email };
+    account.name = name;
+    account.email = email;
     if (newPassword) {
       const passwordSalt = randomBytes(16).toString("hex");
-      update.passwordSalt = passwordSalt;
-      update.passwordHash = await hashPassword(newPassword, passwordSalt);
+      account.passwordSalt = passwordSalt;
+      account.passwordHash = await hashPassword(newPassword, passwordSalt);
     }
-    await accounts.updateOne({ email: session.email }, { $set: update });
-    await db.collection<ScoreEntry>("scores").updateMany(
-      { email: session.email },
-      { $set: { email, name } },
-    );
-
+    await account.save();
     return Response.json(
       { profile: { name, email } },
-      { headers: { "Set-Cookie": createSessionCookie(name, email) } },
+      { headers: { "Set-Cookie": createSessionCookie(account._id.toString(), name, email) } },
     );
   } catch (error) {
     console.error("Failed to update profile:", error);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) {
+      return Response.json({ error: "That email is already in use." }, { status: 409 });
+    }
     return Response.json({ error: "Could not update your profile." }, { status: 500 });
   }
 }

@@ -1,16 +1,10 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { createSessionCookie } from "../../../../lib/auth-session";
-import { getDatabase } from "../../../../lib/mongodb";
+import connectToDatabase from "../../../../lib/mongoose";
+import User from "../../../../models/User";
 
 const scrypt = promisify(scryptCallback);
-
-type Account = {
-  name: string;
-  email: string;
-  passwordHash: string;
-  passwordSalt: string;
-};
 
 async function hashPassword(password: string, salt: string) {
   const result = (await scrypt(password, salt, 64)) as Buffer;
@@ -48,10 +42,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const db = await getDatabase();
-    const accounts = db.collection<Account>("users");
-    await accounts.createIndex({ email: 1 }, { unique: true });
-    let account = await accounts.findOne({ email });
+    await connectToDatabase();
+    let account = await User.findOne({ email }).exec();
 
     if (account) {
       const submittedHash = Buffer.from(await hashPassword(password, account.passwordSalt), "hex");
@@ -64,21 +56,24 @@ export async function POST(request: Request) {
         return Response.json({ error: "Account not found. Enter your name to create an account." }, { status: 404 });
       }
       const passwordSalt = randomBytes(16).toString("hex");
-      account = {
+      account = new User({
         name,
         email,
         passwordSalt,
         passwordHash: await hashPassword(password, passwordSalt),
-      };
-      await accounts.insertOne(account);
+      });
+      await account.save();
     }
 
     return Response.json(
       { name: account.name, email: account.email },
-      { headers: { "Set-Cookie": createSessionCookie(account.name, account.email) } },
+      { headers: { "Set-Cookie": createSessionCookie(account._id.toString(), account.name, account.email) } },
     );
   } catch (error) {
     console.error("Sign-in failed:", error);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) {
+      return Response.json({ error: "An account with this email already exists. Please sign in." }, { status: 409 });
+    }
     return Response.json({ error: "Could not sign in right now. Please try again." }, { status: 500 });
   }
 }

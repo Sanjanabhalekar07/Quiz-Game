@@ -9,15 +9,10 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type { QuizQuestion } from "./questions";
+import type { QuizQuestion } from "./quiz-data";
 import {
-  createRound,
-  gameSessionKey,
   isQuizQuestion,
   isScoreEntry,
-  leaderboardKey,
-  playerNameKey,
-  playerEmailKey,
   type ScoreEntry,
 } from "./quiz-data";
 
@@ -26,6 +21,7 @@ type QuizState = {
   playerName: string;
   playerEmail: string;
   selectedCategory: string | null;
+  selectedCategoryId: string | null;
   round: QuizQuestion[];
   questionIndex: number;
   correctCount: number;
@@ -39,6 +35,7 @@ const initialState: QuizState = {
   playerName: "",
   playerEmail: "",
   selectedCategory: null,
+  selectedCategoryId: null,
   round: [],
   questionIndex: 0,
   correctCount: 0,
@@ -47,60 +44,10 @@ const initialState: QuizState = {
   leaderboard: [],
 };
 
-let cachedState: QuizState | null = null;
+let cachedState: QuizState = initialState;
 const listeners = new Set<() => void>();
 
-function readState(): QuizState {
-  if (typeof window === "undefined") return initialState;
-
-  try {
-    const playerName = window.localStorage.getItem(playerNameKey) ?? "";
-    const playerEmail = window.localStorage.getItem(playerEmailKey) ?? "";
-    const savedScores = JSON.parse(
-      window.localStorage.getItem(leaderboardKey) ?? "[]",
-    ) as unknown;
-    const savedSession = JSON.parse(
-      window.sessionStorage.getItem(gameSessionKey) ?? "{}",
-    ) as Partial<QuizState>;
-    const round = Array.isArray(savedSession.round)
-      ? savedSession.round.filter(isQuizQuestion)
-      : [];
-    const leaderboard = Array.isArray(savedScores)
-      ? savedScores
-          .filter(isScoreEntry)
-          .sort((a, b) => b.score - a.score || b.playedAt - a.playedAt)
-          .slice(0, 10)
-      : [];
-
-    return {
-      ...initialState,
-      hydrated: true,
-      playerName,
-      playerEmail,
-      leaderboard,
-      selectedCategory:
-        typeof savedSession.selectedCategory === "string"
-          ? savedSession.selectedCategory
-          : null,
-      round,
-      questionIndex:
-        typeof savedSession.questionIndex === "number"
-          ? Math.min(Math.max(0, savedSession.questionIndex), Math.max(0, round.length - 1))
-          : 0,
-      correctCount:
-        typeof savedSession.correctCount === "number"
-          ? Math.max(0, savedSession.correctCount)
-          : 0,
-      isComplete: Boolean(savedSession.isComplete),
-      hasSubmitted: Boolean(savedSession.hasSubmitted),
-    };
-  } catch {
-    return { ...initialState, hydrated: true };
-  }
-}
-
 function getSnapshot() {
-  if (!cachedState) cachedState = readState();
   return cachedState;
 }
 
@@ -114,62 +61,23 @@ function notifyListeners() {
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
-
-  function handleStorage(event: StorageEvent) {
-    if (
-      event.key === null ||
-      event.key === playerNameKey ||
-      event.key === playerEmailKey ||
-      event.key === leaderboardKey ||
-      event.key === gameSessionKey
-    ) {
-      cachedState = null;
-      notifyListeners();
-    }
-  }
-
-  window.addEventListener("storage", handleStorage);
   return () => {
     listeners.delete(listener);
-    window.removeEventListener("storage", handleStorage);
   };
 }
 
 function updateState(updater: (current: QuizState) => QuizState) {
   const nextState = updater(getSnapshot());
   cachedState = nextState;
-
-  try {
-    window.localStorage.setItem(playerNameKey, nextState.playerName);
-    window.localStorage.setItem(playerEmailKey, nextState.playerEmail);
-    window.localStorage.setItem(
-      leaderboardKey,
-      JSON.stringify(nextState.leaderboard),
-    );
-    window.sessionStorage.setItem(
-      gameSessionKey,
-      JSON.stringify({
-        selectedCategory: nextState.selectedCategory,
-        round: nextState.round,
-        questionIndex: nextState.questionIndex,
-        correctCount: nextState.correctCount,
-        isComplete: nextState.isComplete,
-        hasSubmitted: nextState.hasSubmitted,
-      }),
-    );
-  } catch {
-    // The quiz still works for the current visit when browser storage is unavailable.
-  }
-
   notifyListeners();
 }
 
 type QuizContextValue = QuizState & {
   setPlayerName: (name: string, email: string) => void;
   updatePlayerIdentity: (name: string, email: string) => void;
-  selectCategory: (category: string) => void;
+  selectCategory: (categoryId: string, categoryName: string) => Promise<string | null>;
   submitAnswer: (isCorrect: boolean, expectedQuestionIndex: number) => Promise<boolean>;
-  replayCategory: () => void;
+  replayCategory: () => Promise<string | null>;
   chooseAnotherCategory: () => void;
   startNextGame: () => void;
 };
@@ -180,6 +88,21 @@ export function QuizProvider({ children }: { children: ReactNode }) {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
+    void fetch("/api/auth/session")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not verify session.");
+        const data = (await response.json()) as { user?: { name: string; email: string } | null };
+        updateState((current) => ({
+          ...current,
+          hydrated: true,
+          playerName: data.user?.name ?? "",
+          playerEmail: data.user?.email ?? "",
+        }));
+      })
+      .catch(() => {
+        updateState((current) => ({ ...current, hydrated: true }));
+      });
+
     void fetch("/api/scores")
       .then((response) => (response.ok ? response.json() : null))
       .then((data: { scores?: unknown } | null) => {
@@ -191,7 +114,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
         updateState((current) => ({ ...current, leaderboard }));
       })
       .catch(() => {
-        // Keep the locally saved leaderboard available when the database is offline.
+        // Leave the leaderboard empty when the database is unavailable.
       });
   }, []);
 
@@ -201,6 +124,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
       playerName: name,
       playerEmail: email,
       selectedCategory: null,
+      selectedCategoryId: null,
       round: [],
       questionIndex: 0,
       correctCount: 0,
@@ -217,16 +141,30 @@ export function QuizProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const selectCategory = useCallback((category: string) => {
-    updateState((current) => ({
-      ...current,
-      selectedCategory: category,
-      round: createRound(category),
-      questionIndex: 0,
-      correctCount: 0,
-      isComplete: false,
-      hasSubmitted: false,
-    }));
+  const selectCategory = useCallback(async (categoryId: string, categoryName: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`/api/quiz/questions?categoryId=${encodeURIComponent(categoryId)}`, { cache: "no-store" });
+      const data = await response.json() as { questions?: unknown; error?: string };
+      if (!response.ok) return data.error ?? "Could not load questions for this category.";
+      if (!Array.isArray(data.questions) || !data.questions.every(isQuizQuestion)) {
+        return "The questions for this category could not be read. Please contact the quiz administrator.";
+      }
+      updateState((current) => ({
+        ...current,
+        selectedCategory: categoryName,
+        selectedCategoryId: categoryId,
+        round: data.questions as QuizQuestion[],
+        questionIndex: 0,
+        correctCount: 0,
+        isComplete: false,
+        hasSubmitted: false,
+      }));
+      return null;
+    } catch (error) {
+      return error instanceof Error
+        ? `Could not reach the question service: ${error.message}`
+        : "Could not reach the question service. Please try again.";
+    }
   }, []);
 
   const submitAnswer = useCallback(async (isCorrect: boolean, expectedQuestionIndex: number) => {
@@ -255,8 +193,6 @@ export function QuizProvider({ children }: { children: ReactNode }) {
 
     const category = current.selectedCategory ?? current.round[0].category;
     const entry: ScoreEntry = {
-      name: current.playerName,
-      email: current.playerEmail,
       score: correctCount,
       category,
       playedAt: Date.now(),
@@ -289,30 +225,24 @@ export function QuizProvider({ children }: { children: ReactNode }) {
         updateState((latest) => ({ ...latest, leaderboard: scores }));
       }
     } catch {
-      // The completed round remains saved locally if MongoDB is unavailable.
+      // Keep the results available in memory for this page visit.
     }
     return true;
   }, []);
 
-  const replayCategory = useCallback(() => {
+  const replayCategory = useCallback(async () => {
     const current = getSnapshot();
-    const category = current.selectedCategory ?? current.round[0]?.category;
-    if (!category) return;
-    updateState((latest) => ({
-      ...latest,
-      selectedCategory: category,
-      round: createRound(category),
-      questionIndex: 0,
-      correctCount: 0,
-      isComplete: false,
-      hasSubmitted: false,
-    }));
-  }, []);
+    const categoryId = current.selectedCategoryId;
+    const categoryName = current.selectedCategory ?? current.round[0]?.category;
+    if (!categoryId || !categoryName) return "Choose a category first.";
+    return selectCategory(categoryId, categoryName);
+  }, [selectCategory]);
 
   const chooseAnotherCategory = useCallback(() => {
     updateState((current) => ({
       ...current,
       selectedCategory: null,
+      selectedCategoryId: null,
       round: [],
       questionIndex: 0,
       correctCount: 0,
@@ -324,6 +254,7 @@ export function QuizProvider({ children }: { children: ReactNode }) {
   const startNextGame = useCallback(() => {
     updateState((current) => ({
       ...initialState,
+      hydrated: true,
       leaderboard: current.leaderboard,
     }));
   }, []);

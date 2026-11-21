@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuiz } from "../quiz-context";
 import { categoryClass, questionsPerRound, type ScoreEntry } from "../quiz-data";
 
 export function ResultsStep() {
   const router = useRouter();
+  const [replayError, setReplayError] = useState("");
   const {
     hydrated,
     playerName,
@@ -30,9 +31,10 @@ export function ResultsStep() {
     return <div className="quiz-loading" role="status">Getting your resultsâ€¦</div>;
   }
 
-  function replay() {
-    replayCategory();
-    router.push("/quiz");
+  async function replay() {
+    const error = await replayCategory();
+    if (error) setReplayError(error);
+    else router.push("/quiz");
   }
 
   function chooseAnother() {
@@ -89,6 +91,7 @@ export function ResultsStep() {
           Choose Category
         </button>
       </div>
+      {replayError ? <p role="alert">{replayError}</p> : null}
       <p className="result-footnote">Thanks for playing. Stay curious!</p>
     </div>
   );
@@ -106,7 +109,7 @@ function Leaderboard({ scores }: { scores: ScoreEntry[] }) {
           {scores.map((entry, index) => (
             <li className={categoryClass(entry.category)} key={`${entry.playedAt}-${index}`}>
               <span className="leaderboard-rank">{index + 1}</span>
-              <span className="leaderboard-name">{entry.name}</span>
+              <span className="leaderboard-name">{entry.name ?? "Player"}</span>
               <span className="leaderboard-category">{entry.category ?? "General Knowledge"}</span>
               <strong>{entry.score}/{questionsPerRound}</strong>
             </li>

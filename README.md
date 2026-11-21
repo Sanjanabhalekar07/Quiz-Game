@@ -37,7 +37,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 # MongoDB setup
 
-The quiz saves completed scores to MongoDB and reads the shared top 10 leaderboard.
+The quiz stores categories, questions, accounts, and scores in MongoDB and reads the shared top 10 leaderboard. Each question references its category document by MongoDB ObjectId. Categories and questions are loaded from MongoDB; empty collections remain empty until content is added to the database.
 
 1. Create a MongoDB database and database user, then allow your app's IP address in the cluster's network access settings.
 2. Copy `.env.example` to `.env.local`.
@@ -46,4 +46,8 @@ The quiz saves completed scores to MongoDB and reads the shared top 10 leaderboa
 5. Optionally change `MONGODB_DB` to choose a database name.
 6. Run `npm run dev`.
 
-The first sign-in with a new email creates an account; later sign-ins check the password. Passwords are salted and hashed before storage. Scores are still kept in browser storage as a fallback when MongoDB is unavailable. The score API accepts client-reported scores without verifying that they were earned through a quiz session.
+The first sign-in with a new email creates an account; later sign-ins check the password. Passwords are salted and hashed before storage. Accounts, scores, and game history are stored in MongoDB. The signed session uses an HTTP-only cookie; active quiz progress stays in memory and resets if the page is refreshed. Scores cannot be saved while MongoDB is unavailable. The score API accepts client-reported scores without verifying that they were earned through a quiz session.
+
+## Admin login
+
+Admin accounts are stored separately in the `admins` collection and do not have public registration. With `MONGODB_URI` configured, run `node --env-file=.env scripts/create-admin.mjs` to create an admin account interactively, then sign in at `/admin/login`. Admin sessions use a separate HTTP-only cookie from player sessions.

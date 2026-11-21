@@ -1,19 +1,19 @@
-import { getDatabase } from "../../../../lib/mongodb";
 import { getAuthSession } from "../../../../lib/auth-session";
-import type { ScoreEntry } from "../../../quiz-data";
+import connectToDatabase from "../../../../lib/mongoose";
+import Score from "../../../../models/Score";
 
 export async function GET(request: Request) {
   const session = getAuthSession(request);
   if (!session) return Response.json({ error: "Please sign in to view game history." }, { status: 401 });
 
   try {
-    const db = await getDatabase();
-    const games = await db
-      .collection<ScoreEntry>("scores")
-      .find({ email: session.email }, { projection: { _id: 0 } })
+    await connectToDatabase();
+    const games = await Score.find({ user_id: session.userId })
+      .select("-_id -user_id")
       .sort({ playedAt: -1 })
       .limit(20)
-      .toArray();
+      .lean()
+      .exec();
 
     return Response.json({ games });
   } catch (error) {
