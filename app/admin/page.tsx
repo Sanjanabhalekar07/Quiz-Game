@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminAnalyticsChart } from "../components/admin-analytics-chart";
 import { AdminHeader } from "../components/admin-header";
 
 type AdminIdentity = { name: string; email: string };
@@ -93,6 +94,8 @@ export default function AdminDashboardPage() {
             <span className="admin-summary-caption">Completed rounds recorded</span>
           </article>
         </section>
+
+        <AdminAnalyticsChart />
 
         <section className="admin-users-card" aria-labelledby="admin-users-title">
           <div className="admin-users-card-header">

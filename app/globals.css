@@ -803,6 +803,62 @@ a:focus-visible {
 .admin-summary-number { color: #3e5c49; font-size: 32px; font-weight: 650; letter-spacing: -1px; line-height: 1.1; }
 .admin-summary-caption { color: #989a93; font-size: 11px; }
 
+.admin-analytics-card {
+  margin-bottom: 22px;
+  overflow: hidden;
+  border: 1px solid #e9e9e3;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgb(32 33 31 / 3%);
+}
+.admin-analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px 12px;
+}
+.admin-analytics-header .admin-eyebrow { margin-bottom: 7px; }
+.admin-analytics-header h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 23px;
+  font-weight: 400;
+}
+.admin-analytics-header > div:first-child > p:last-child { margin: 5px 0 0; color: #777971; font-size: 12px; }
+.admin-analytics-ranges { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px; border: 1px solid #e9e9e3; border-radius: 9px; background: #f8f9f6; }
+.admin-analytics-ranges button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #6d7068;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+.admin-analytics-ranges button:hover { background: #edf2eb; color: #3e5c49; }
+.admin-analytics-ranges button.active { background: #3e5c49; color: #fff; }
+.admin-chart-legend { display: flex; gap: 18px; padding: 8px 24px 0; color: #686b63; font-size: 11px; }
+.admin-chart-legend > span { display: inline-flex; align-items: center; gap: 7px; }
+.admin-chart-key { width: 9px; height: 9px; border-radius: 50%; background: #54705e; }
+.admin-chart-key.games { background: #d18b4f; }
+.admin-chart-scroll { overflow-x: auto; padding: 6px 12px 10px; }
+.admin-activity-chart { display: block; width: 100%; min-width: 720px; height: auto; }
+.admin-chart-grid-line { stroke: #eef0eb; stroke-width: 1; }
+.admin-chart-y-label,
+.admin-chart-x-label { fill: #92948d; font-family: inherit; font-size: 10px; }
+.admin-chart-line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.admin-chart-line.users { stroke: #54705e; }
+.admin-chart-line.games { stroke: #d18b4f; }
+.admin-chart-area.users { fill: #54705e; fill-opacity: 0.07; }
+.admin-chart-area.games { fill: #d18b4f; fill-opacity: 0.06; }
+.admin-chart-point.users { fill: #54705e; stroke: #fff; stroke-width: 1; }
+.admin-chart-point.games { fill: #d18b4f; stroke: #fff; stroke-width: 1; }
+.admin-chart-message { margin: 0; padding: 18px 24px 24px; color: #777971; font-size: 12px; }
+
 .admin-users-card {
   overflow: hidden;
   border: 1px solid #e9e9e3;
@@ -1736,6 +1792,10 @@ a:focus-visible {
   .admin-welcome { margin-bottom: 22px; }
   .admin-summary-grid { grid-template-columns: minmax(0, 1fr); }
   .admin-summary-card { min-height: 112px; }
+  .admin-analytics-header { align-items: flex-start; flex-direction: column; padding: 18px 16px 12px; }
+  .admin-analytics-ranges { width: 100%; }
+  .admin-analytics-ranges button { flex: 1; padding: 0 6px; font-size: 10px; }
+  .admin-chart-legend { padding-right: 16px; padding-left: 16px; }
   .admin-manage-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .admin-editor-card { padding: 18px; }
   .admin-category-list > li { grid-template-columns: 34px minmax(0, 1fr); gap: 9px; padding: 13px 14px; }
