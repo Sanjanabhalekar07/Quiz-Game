@@ -25,9 +25,13 @@ function questionInput(value: unknown): QuestionInput | null {
 export async function GET(request: Request) {
   try {
     if (!(await hasAdminAccess(request))) return Response.json({ error: "Admin sign-in is required." }, { status: 401 });
-    const [categories, questions] = await Promise.all([
+    const requestedPage = Number.parseInt(new URL(request.url).searchParams.get("page") ?? "1", 10);
+    const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const pageSize = 20;
+    const [categories, questions, total] = await Promise.all([
       Category.find({}).select("name").lean(),
-      Question.find({}).select("question category options answer").sort({ question: 1 }).limit(1000).lean(),
+      Question.find({}).select("question category options answer").sort({ question: 1, _id: 1 }).skip((page - 1) * pageSize).limit(pageSize).lean(),
+      Question.countDocuments({}),
     ]);
     const categoryNames = new Map(categories.map((category) => [category._id.toString(), category.name]));
     const result = questions.map((question) => {
@@ -41,7 +45,7 @@ export async function GET(request: Request) {
         answer: question.answer,
       };
     });
-    return Response.json({ categories, questions: result }, { headers: { "Cache-Control": "no-store, private" } });
+    return Response.json({ categories, questions: result, total, page, pageSize }, { headers: { "Cache-Control": "no-store, private" } });
   } catch (error) {
     console.error("Could not load managed questions:", error);
     return Response.json({ error: "Could not load questions." }, { status: 500 });

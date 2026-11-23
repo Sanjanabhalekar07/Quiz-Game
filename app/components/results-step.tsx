@@ -44,10 +44,7 @@ export function ResultsStep() {
 
   return (
     <div className="results">
-      <span className="result-icon" aria-hidden="true">
-        {correctCount >= 7 ? "âœ¦" : "âœ“"}
-      </span>
-      <p className="question-kicker">STEP 4 Â· QUIZ COMPLETE</p>
+      <p className="question-kicker">STEP 4 | QUIZ COMPLETE</p>
       <h2 className="result-title">
         {correctCount === questionsPerRound
           ? "A perfect round!"
@@ -79,7 +76,10 @@ export function ResultsStep() {
 
       <div className="result-actions">
         <button className="restart-button" onClick={replay} type="button">
-          <span aria-hidden="true">â†»</span> Give it another go
+          <svg className="action-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M13.5 4.5A5.5 5.5 0 0 0 4 3L2.5 4.5m0 0v-3m0 3h3M2.5 11.5A5.5 5.5 0 0 0 12 13l1.5-1.5m0 0v3m0-3h-3" />
+          </svg>
+          Give it another go
         </button>
         <button className="restart-button secondary-action choose-category-action" onClick={chooseAnother} type="button">
           <svg className="action-icon" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">

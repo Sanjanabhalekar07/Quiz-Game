@@ -17,27 +17,66 @@ type Question = {
 type QuestionForm = { question: string; category: string; options: string[]; answer: string };
 const emptyForm: QuestionForm = { question: "", category: "", options: ["", "", "", ""], answer: "" };
 
+function paginationItems(currentPage: number, totalPages: number) {
+  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1) as Array<number | "ellipsis">;
+  if (currentPage <= 3) return [1, 2, 3, "ellipsis", totalPages] as Array<number | "ellipsis">;
+  if (currentPage >= totalPages - 2) {
+    return [1, "ellipsis", totalPages - 2, totalPages - 1, totalPages] as Array<number | "ellipsis">;
+  }
+  return [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages] as Array<number | "ellipsis">;
+}
+
+function PaginationArrow({ double = false, direction }: { double?: boolean; direction: "left" | "right" }) {
+  const left = direction === "left";
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {double ? (left
+        ? <path d="m7 3-5 5 5 5M14 3 9 8l5 5" />
+        : <path d="m9 3 5 5-5 5M2 3l5 5-5 5" />)
+        : left
+          ? <path d="m10 3-5 5 5 5" />
+          : <path d="m6 3 5 5-5 5" />}
+    </svg>
+  );
+}
+
 export function AdminQuestionsManager() {
   const router = useRouter();
   const [admin, setAdmin] = useState<AdminIdentity | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [form, setForm] = useState<QuestionForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function loadQuestions() {
-    const response = await fetch("/api/admin/questions", { cache: "no-store" });
-    const data = (await response.json()) as { categories?: Category[]; questions?: Question[]; error?: string };
-    if (!response.ok) throw new Error(data.error ?? "Could not load questions.");
-    setCategories(data.categories ?? []);
-    setQuestions(data.questions ?? []);
-    if (!form.category && data.categories?.[0]) {
-      setForm((current) => ({ ...current, category: data.categories![0]._id }));
+  async function loadQuestions(page = currentPage) {
+    setPageLoading(true);
+    try {
+      const response = await fetch(`/api/admin/questions?page=${page}`, { cache: "no-store" });
+      const data = (await response.json()) as {
+        categories?: Category[];
+        questions?: Question[];
+        total?: number;
+        page?: number;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(data.error ?? "Could not load questions.");
+      setCategories(data.categories ?? []);
+      setQuestions(data.questions ?? []);
+      setTotalQuestions(data.total ?? 0);
+      setCurrentPage(data.page ?? page);
+      if (!form.category && data.categories?.[0]) {
+        setForm((current) => ({ ...current, category: data.categories![0]._id }));
+      }
+    } finally {
+      setPageLoading(false);
     }
   }
 
@@ -82,6 +121,7 @@ export function AdminQuestionsManager() {
     setSaving(true);
     setError("");
     setMessage("");
+    const wasEditing = Boolean(editingId);
     try {
       const response = await fetch(editingId ? `/api/admin/questions/${editingId}` : "/api/admin/questions", {
         method: editingId ? "PATCH" : "POST",
@@ -90,11 +130,11 @@ export function AdminQuestionsManager() {
       });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Could not save question.");
-      await loadQuestions();
+      await loadQuestions(wasEditing ? currentPage : 1);
       const category = form.category;
       setForm({ ...emptyForm, category });
       setEditingId(null);
-      setMessage(editingId ? "Question updated." : "Question created.");
+      setMessage(wasEditing ? "Question updated." : "Question created.");
       setModalOpen(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save question.");
@@ -144,7 +184,8 @@ export function AdminQuestionsManager() {
       const response = await fetch(`/api/admin/questions/${question._id}`, { method: "DELETE" });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "Could not delete question.");
-      await loadQuestions();
+      const nextPage = questions.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      await loadQuestions(nextPage);
       if (editingId === question._id) {
         setEditingId(null);
         setForm({ ...emptyForm, category: question.category });
@@ -154,6 +195,8 @@ export function AdminQuestionsManager() {
       setError(reason instanceof Error ? reason.message : "Could not delete question.");
     }
   }
+
+  const totalPages = Math.max(1, Math.ceil(totalQuestions / 20));
 
   return (
     <main className="admin-dashboard-page">
@@ -174,26 +217,66 @@ export function AdminQuestionsManager() {
         <div className="admin-manage-grid questions-manage-grid">
           <section className="admin-list-card" aria-labelledby="question-list-title">
             <div className="admin-list-heading">
-              <div><h2 id="question-list-title">Questions</h2><p>{questions.length} loaded</p></div>
+              <div><h2 id="question-list-title">Questions</h2><p>{totalQuestions} total</p></div>
             </div>
-            {loading ? <p className="admin-table-message" role="status">Loading questions…</p> : null}
-            {!loading && questions.length === 0 ? <p className="admin-table-message">No questions yet. Add one to get started.</p> : null}
-            <ul className="admin-question-list">
-              {questions.map((question) => (
-                <li key={question._id}>
-                  <div className="admin-question-copy">
-                    <span className="admin-question-category">{question.categoryName}</span>
-                    <strong>{question.question}</strong>
-                    <span className="admin-question-answer">Correct answer: {question.answer}</span>
-                  </div>
-                  <span className="admin-row-actions">
-                    <button className="admin-row-button" onClick={() => editQuestion(question)} type="button">Edit</button>
-                    <button className="admin-row-button danger" onClick={() => void deleteQuestion(question)} type="button">Delete</button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {questions.length >= 1000 ? <p className="admin-table-footnote">Showing the first 1,000 questions.</p> : null}
+            {loading || pageLoading ? <p className="admin-table-message" role="status">Loading questions…</p> : null}
+            {!loading && !pageLoading && questions.length === 0 ? <p className="admin-table-message">No questions yet. Add one to get started.</p> : null}
+            {!pageLoading ? (
+              <ul className="admin-question-list">
+                {questions.map((question) => (
+                  <li key={question._id}>
+                    <div className="admin-question-copy">
+                      <span className="admin-question-category">{question.categoryName}</span>
+                      <strong>{question.question}</strong>
+                      <span className="admin-question-answer">Correct answer: {question.answer}</span>
+                    </div>
+                    <span className="admin-row-actions">
+                      <button className="admin-row-button" onClick={() => editQuestion(question)} type="button">Edit</button>
+                      <button className="admin-row-button danger" onClick={() => void deleteQuestion(question)} type="button">Delete</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {totalQuestions > 20 ? (
+              <nav className="admin-pagination" aria-label="Question pages">
+                <div className="admin-pagination-pages">
+                  <button aria-label="First page" className="admin-page-button" disabled={currentPage <= 1 || pageLoading}
+                    onClick={() => void loadQuestions(1).catch(() => undefined)} type="button">
+                    <PaginationArrow double direction="left" />
+                  </button>
+                  <button aria-label="Previous page" className="admin-page-button" disabled={currentPage <= 1 || pageLoading}
+                    onClick={() => void loadQuestions(currentPage - 1).catch(() => undefined)} type="button">
+                    <PaginationArrow direction="left" />
+                  </button>
+                  {paginationItems(currentPage, totalPages).map((item, index) => item === "ellipsis" ? (
+                    <span aria-hidden="true" className="admin-page-ellipsis" key={`ellipsis-${index}`}>…</span>
+                  ) : (
+                    <button aria-current={item === currentPage ? "page" : undefined}
+                      className={`admin-page-button${item === currentPage ? " active" : ""}`}
+                      disabled={pageLoading} key={item}
+                      onClick={() => void loadQuestions(item).catch(() => undefined)} type="button">
+                      {item}
+                    </button>
+                  ))}
+                  <button aria-label="Next page" className="admin-page-button" disabled={currentPage >= totalPages || pageLoading}
+                    onClick={() => void loadQuestions(currentPage + 1).catch(() => undefined)} type="button">
+                    <PaginationArrow direction="right" />
+                  </button>
+                  <button aria-label="Last page" className="admin-page-button" disabled={currentPage >= totalPages || pageLoading}
+                    onClick={() => void loadQuestions(totalPages).catch(() => undefined)} type="button">
+                    <PaginationArrow double direction="right" />
+                  </button>
+                </div>
+                <label className="admin-pagination-select">
+                  <span>Page</span>
+                  <select disabled={pageLoading} value={currentPage} onChange={(event) => void loadQuestions(Number(event.target.value)).catch(() => undefined)}>
+                    {Array.from({ length: totalPages }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
+                  </select>
+                  <span>of {totalPages}</span>
+                </label>
+              </nav>
+            ) : null}
           </section>
         </div>
 

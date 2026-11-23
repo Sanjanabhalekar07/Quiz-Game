@@ -1238,6 +1238,51 @@ a:focus-visible {
 .admin-question-category { color: #54705e; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; }
 .admin-question-copy > strong { color: #292b27; font-size: 12px; line-height: 1.5; }
 .admin-question-answer { color: #858780; font-size: 10px; }
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 18px;
+  border-top: 1px solid #eeefea;
+  color: #777971;
+  font-size: 11px;
+}
+.admin-pagination .admin-pagination-pages { display: flex; align-items: center; gap: 4px; }
+.admin-pagination .admin-page-button {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid #e8eae5;
+  border-radius: 50%;
+  background: #fff;
+  color: #60635c;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgb(31 37 30 / 8%);
+}
+.admin-pagination .admin-page-button:hover:not(:disabled):not(.active) { background: #f4f6f2; color: #3e5c49; }
+.admin-pagination .admin-page-button.active,
+.admin-pagination .admin-page-button[aria-current="page"] { border-color: #356ee8; background: #356ee8; color: #fff; }
+.admin-pagination .admin-page-button:disabled { cursor: not-allowed; opacity: 0.65; }
+.admin-page-ellipsis { min-width: 26px; color: #858780; text-align: center; }
+.admin-pagination-select { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.admin-pagination-select select {
+  min-width: 48px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid #e2e4de;
+  border-radius: 7px;
+  background: #fff;
+  color: #30322e;
+  font: inherit;
+  font-size: 11px;
+}
 
 .name-form {
   display: grid;
@@ -1805,6 +1850,9 @@ a:focus-visible {
   .admin-managed-avatar { width: 38px; height: 38px; }
   .admin-managed-list .admin-row-actions { grid-column: 2; justify-self: start; }
   .admin-question-list > li { align-items: flex-start; flex-direction: column; gap: 9px; padding: 14px; }
+  .admin-pagination { align-items: flex-start; flex-direction: column; gap: 12px; padding: 13px 14px; }
+  .admin-pagination-pages { max-width: 100%; gap: 3px; flex-wrap: wrap; }
+  .admin-pagination .admin-page-button { min-width: 27px; height: 27px; }
   .admin-users-card-header { align-items: flex-start; padding: 17px 16px; }
   .admin-users-card-header h2 { font-size: 21px; }
   .admin-users-table { min-width: 560px; }
